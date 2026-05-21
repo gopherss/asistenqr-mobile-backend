@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DIRECTOR
+  DOCENTE
+  TERMINAL
+}
+
+enum EstadoAsistencia {
+  PUNTUAL
+  TARDE
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  nombres   String
+  rol       Role     @default(DOCENTE)
+  estado    Boolean  @default(true)
+  dni       String?
+  telefono  String?
+  turnoId   String?  @map("turno_id")
+  turno     Turno?   @relation(fields: [turnoId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  asistencias Asistencia[]
+
+  @@map("profiles")
+}
+
+model Turno {
+  id             String    @id @default(uuid())
+  nombre         String
+  horaEntrada    String    @map("hora_entrada")
+  horaTolerancia String    @map("hora_tolerancia")
+  horaSalida     String    @map("hora_salida")
+  activo         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  profiles       Profile[]
+
+  @@map("turnos")
+}
+
+model Asistencia {
+  id        String             @id @default(uuid())
+  docenteId String             @map("docente_id")
+  docente   Profile            @relation(fields: [docenteId], references: [id])
+  fecha     DateTime           @db.Date
+  hora      String
+  estado    EstadoAsistencia
+  metodo    String             @default("qr")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  @@map("asistencias")
+}
