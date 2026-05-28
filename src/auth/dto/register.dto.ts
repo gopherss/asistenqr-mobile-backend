@@ -7,7 +7,7 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'docente@colegio.com' })
+  @ApiProperty({ example: 'empleado@empresa.com' })
   @IsEmail()
   public readonly email: string;
 
@@ -16,19 +16,13 @@ export class RegisterDto {
   @MinLength(6)
   public readonly  password: string;
 
-  @ApiProperty({ example: 'Docente Nuevo' })
+  @ApiProperty({ example: 'Juan' })
   @IsString()
-  public readonly nombres: string;
+  public readonly nombre: string;
 
-  @ApiProperty({ required: false, example: '12345678' })
+  @ApiProperty({ example: 'Pérez' })
   @IsString()
-  @IsOptional()
-  public readonly dni?: string;
-
-  @ApiProperty({ required: false, example: '999888777' })
-  @IsString()
-  @IsOptional()
-  public readonly telefono?: string;
+  public readonly apellido: string;
 
   @ApiProperty({ required: false, example: 'uuid-del-turno' })
   @IsString()

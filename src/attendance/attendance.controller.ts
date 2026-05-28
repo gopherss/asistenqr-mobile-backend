@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -23,44 +24,48 @@ export class AttendanceController {
   constructor(private service: AttendanceService) {}
 
   @Post('check-in')
-  @ApiOperation({ summary: 'Registrar asistencia con QR (docente)' })
-  checkIn(@CurrentUser('id') userId: string, @Body() dto: CheckInDto) {
-    return this.service.checkIn(userId, dto.qrToken);
+  @ApiOperation({ summary: 'Registrar asistencia con QR (empleado)' })
+  checkIn(@CurrentUser('id') userId: string, @CurrentUser('empresaId') empresaId: string, @Body() dto: CheckInDto) {
+    return this.service.checkIn(userId, empresaId, dto.qrToken);
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Historial de asistencias del docente autenticado' })
-  history(@CurrentUser('id') userId: string) {
-    return this.service.history(userId);
+  @ApiOperation({ summary: 'Historial de asistencias del empleado autenticado' })
+  history(
+    @CurrentUser('id') userId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.history(userId, cursor, limit ? parseInt(limit, 10) : 20);
   }
 
   @Get('missed-dates')
-  @ApiOperation({ summary: 'Fechas faltantes del docente autenticado' })
+  @ApiOperation({ summary: 'Fechas faltantes del empleado autenticado' })
   missedDates(@CurrentUser('id') userId: string) {
     return this.service.missedDates(userId);
   }
 
   @Get('by-date/:date')
   @UseGuards(RolesGuard)
-  @Roles(Role.DIRECTOR)
-  @ApiOperation({ summary: 'Asistencia de todos los docentes en una fecha' })
-  byDate(@Param('date') date: string) {
-    return this.service.byDate(date);
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Asistencia de todos los empleados en una fecha' })
+  byDate(@Param('date') date: string, @CurrentUser('empresaId') empresaId: string) {
+    return this.service.byDate(date, empresaId);
   }
 
   @Get('today')
   @UseGuards(RolesGuard)
-  @Roles(Role.DIRECTOR)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Asistencias del día de hoy' })
-  today() {
-    return this.service.today();
+  today(@CurrentUser('empresaId') empresaId: string) {
+    return this.service.today(empresaId);
   }
 
   @Get('stats')
   @UseGuards(RolesGuard)
-  @Roles(Role.DIRECTOR)
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Estadísticas del dashboard' })
-  stats() {
-    return this.service.stats();
+  stats(@CurrentUser('empresaId') empresaId: string) {
+    return this.service.stats(empresaId);
   }
 }

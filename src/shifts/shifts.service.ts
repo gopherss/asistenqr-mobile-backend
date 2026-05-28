@@ -6,14 +6,17 @@ import { UpdateShiftDto } from './dto/update-shift.dto';
 export class ShiftsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(empresaId: string) {
     return this.prisma.turno.findMany({
+      where: { empresaId },
       orderBy: { nombre: 'asc' },
     });
   }
 
-  async update(id: string, dto: UpdateShiftDto) {
-    const turno = await this.prisma.turno.findUnique({ where: { id } });
+  async update(id: string, dto: UpdateShiftDto, empresaId: string) {
+    const turno = await this.prisma.turno.findFirst({
+      where: { id, empresaId },
+    });
 
     if (!turno) {
       throw new NotFoundException('Turno no encontrado');

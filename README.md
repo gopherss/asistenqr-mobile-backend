@@ -60,9 +60,9 @@ El seed crea los siguientes usuarios:
 
 | Email | Contraseña | Rol |
 |---|---|---|
-| `director@colegio.com` | `admin1234` | Director |
-| `terminal@colegio.com` | `admin1234` | Terminal |
-| `docente1@colegio.com` | `admin1234` | Docente |
+| `director@empresa.com` | `admin1234` | Director |
+| `terminal@empresa.com` | `admin1234` | Terminal |
+| `empleado1@empresa.com` | `admin1234` | Empleado |
 
 ## Ejecución
 
@@ -90,7 +90,7 @@ src/
 ├── auth/           # Módulo de autenticación (JWT, login, registro)
 ├── attendance/     # Módulo de asistencia (check-in, historial, reportes)
 ├── dashboard/      # Estadísticas del dashboard
-├── profiles/       # CRUD de perfiles (docentes)
+├── perfiles/       # CRUD de perfiles (empleados)
 ├── shifts/         # Gestión de turnos
 ├── qr-tokens/      # Generación de tokens QR (HMAC stateless)
 ├── common/         # Decoradores y tipos compartidos
@@ -101,13 +101,13 @@ src/
 
 ### Auth
 - `POST /api/auth/login` — Iniciar sesión
-- `POST /api/auth/register` — Registrar docente (solo director)
+- `POST /api/auth/register` — Registrar empleado (solo director)
 - `GET /api/auth/me` — Perfil del usuario autenticado
 
 ### Attendance
-- `POST /api/attendance/check-in` — Registrar asistencia con QR (docente)
-- `GET /api/attendance/history` — Historial del docente autenticado
-- `GET /api/attendance/missed-dates` — Fechas faltantes del docente
+- `POST /api/attendance/check-in` — Registrar asistencia con QR (empleado)
+- `GET /api/attendance/history` — Historial del empleado autenticado
+- `GET /api/attendance/missed-dates` — Fechas faltantes del empleado
 - `GET /api/attendance/by-date/:date` — Asistencia por fecha (director)
 - `GET /api/attendance/today` — Asistencias del día (director)
 - `GET /api/attendance/stats` — Estadísticas (director)

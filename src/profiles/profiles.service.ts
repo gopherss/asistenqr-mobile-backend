@@ -7,17 +7,17 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export class ProfilesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.profile.findMany({
-      where: { rol: Role.DOCENTE },
+  async findAll(empresaId: string) {
+    return this.prisma.perfil.findMany({
+      where: { rol: Role.EMPLEADO, empresaId },
       include: { turno: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
-    const profile = await this.prisma.profile.findUnique({
-      where: { id },
+  async findOne(id: string, empresaId: string) {
+    const profile = await this.prisma.perfil.findFirst({
+      where: { id, empresaId },
       include: { turno: true },
     });
 
@@ -28,28 +28,32 @@ export class ProfilesService {
     return profile;
   }
 
-  async update(id: string, dto: UpdateProfileDto) {
-    const profile = await this.prisma.profile.findUnique({ where: { id } });
+  async update(id: string, dto: UpdateProfileDto, empresaId: string) {
+    const profile = await this.prisma.perfil.findFirst({
+      where: { id, empresaId },
+    });
 
     if (!profile) {
       throw new NotFoundException('Perfil no encontrado');
     }
 
-    return this.prisma.profile.update({
+    return this.prisma.perfil.update({
       where: { id },
       data: dto,
       include: { turno: true },
     });
   }
 
-  async toggleStatus(id: string) {
-    const profile = await this.prisma.profile.findUnique({ where: { id } });
+  async toggleStatus(id: string, empresaId: string) {
+    const profile = await this.prisma.perfil.findFirst({
+      where: { id, empresaId },
+    });
 
     if (!profile) {
       throw new NotFoundException('Perfil no encontrado');
     }
 
-    return this.prisma.profile.update({
+    return this.prisma.perfil.update({
       where: { id },
       data: { estado: !profile.estado },
       include: { turno: true },

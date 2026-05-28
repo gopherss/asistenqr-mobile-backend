@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -18,8 +19,9 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    const profile = await this.prisma.profile.findUnique({
+    const profile = await this.prisma.perfil.findUnique({
       where: { email: dto.email },
+      include: { empresa: true },
     });
 
     if (!profile) {
@@ -30,6 +32,10 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
+    if (profile.empresa && !profile.empresa.activo) {
+      throw new UnauthorizedException('Empresa inactiva');
+    }
+
     const passwordValid = await bcrypt.compare(dto.password, profile.password);
     if (!passwordValid) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -38,8 +44,8 @@ export class AuthService {
     return this.generateAuthResponse(profile);
   }
 
-  async register(dto: RegisterDto) {
-    const existing = await this.prisma.profile.findUnique({
+  async register(dto: RegisterDto, adminEmpresaId: string) {
+    const existing = await this.prisma.perfil.findUnique({
       where: { email: dto.email },
     });
 
@@ -47,17 +53,35 @@ export class AuthService {
       throw new ConflictException('El email ya está registrado');
     }
 
+    const empresa = await this.prisma.empresa.findUnique({
+      where: { id: adminEmpresaId },
+    });
+
+    if (!empresa) {
+      throw new BadRequestException('Empresa no encontrada');
+    }
+
+    const empleadosCount = await this.prisma.perfil.count({
+      where: { empresaId: adminEmpresaId, rol: Role.EMPLEADO },
+    });
+
+    if (empleadosCount >= empresa.maxEmpleados) {
+      throw new BadRequestException(
+        `Límite de ${empresa.maxEmpleados} empleados alcanzado`,
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const profile = await this.prisma.profile.create({
+    const profile = await this.prisma.perfil.create({
       data: {
         email: dto.email,
         password: hashedPassword,
-        nombres: dto.nombres,
-        rol: Role.DOCENTE,
-        dni: dto.dni,
-        telefono: dto.telefono,
+        nombre: dto.nombre,
+        apellido: dto.apellido,
+        rol: Role.EMPLEADO,
         turnoId: dto.turnoId,
+        empresaId: adminEmpresaId,
         estado: true,
       },
     });
@@ -66,24 +90,33 @@ export class AuthService {
   }
 
   async me(userId: string) {
-    const profile = await this.prisma.profile.findUnique({
+    const profile = await this.prisma.perfil.findUnique({
       where: { id: userId },
-      include: { turno: true },
+      include: { turno: true, empresa: true },
     });
 
     if (!profile) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
+    if (!profile.estado) {
+      throw new UnauthorizedException('Usuario inactivo');
+    }
+
+    if (profile.empresa && !profile.empresa.activo) {
+      throw new UnauthorizedException('Empresa inactiva');
+    }
+
     const { password, ...user } = profile;
     return user;
   }
 
-  private generateAuthResponse(profile: { id: string; email: string; nombres: string; rol: string }) {
+  private generateAuthResponse(profile: { id: string; email: string; nombre: string; apellido: string; rol: string; empresaId: string | null }) {
     const payload = {
       sub: profile.id,
       email: profile.email,
       rol: profile.rol,
+      empresaId: profile.empresaId,
     };
 
     return {
@@ -91,8 +124,10 @@ export class AuthService {
       user: {
         id: profile.id,
         email: profile.email,
-        nombres: profile.nombres,
+        nombre: profile.nombre,
+        apellido: profile.apellido,
         rol: profile.rol,
+        empresaId: profile.empresaId,
       },
     };
   }

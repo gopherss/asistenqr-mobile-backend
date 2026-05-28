@@ -11,14 +11,22 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async checkIn(userId: string, qrToken: string) {
+  async checkIn(userId: string, empresaId: string, qrToken: string) {
     const secret = process.env.TERMINAL_SECRET || 'terminal-secret';
 
-    const [timestampStr, signature] = qrToken.split('.');
+    const parts = qrToken.split('.');
+    if (parts.length !== 3) {
+      throw new BadRequestException('Token QR inválido');
+    }
+    const [timestampStr, qrEmpresaId, signature] = parts;
     const timestamp = parseInt(timestampStr, 10);
 
     if (isNaN(timestamp)) {
       throw new BadRequestException('Token QR inválido');
+    }
+
+    if (qrEmpresaId !== empresaId) {
+      throw new ForbiddenException('El QR no pertenece a tu empresa');
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -30,14 +38,14 @@ export class AttendanceService {
 
     const expectedSig = crypto
       .createHmac('sha256', secret)
-      .update(timestampStr)
+      .update(`${timestampStr}.${qrEmpresaId}`)
       .digest('hex');
 
     if (signature !== expectedSig) {
       throw new ForbiddenException('Token QR inválido');
     }
 
-    const profile = await this.prisma.profile.findUnique({
+    const profile = await this.prisma.perfil.findUnique({
       where: { id: userId },
       include: { turno: true },
     });
@@ -51,7 +59,7 @@ export class AttendanceService {
 
     const existing = await this.prisma.asistencia.findFirst({
       where: {
-        docenteId: userId,
+        empleadoId: userId,
         fecha: today,
       },
     });
@@ -73,7 +81,8 @@ export class AttendanceService {
 
     const asistencia = await this.prisma.asistencia.create({
       data: {
-        docenteId: userId,
+        empleadoId: userId,
+        empresaId,
         fecha: today,
         hora: currentHour,
         estado,
@@ -92,46 +101,36 @@ export class AttendanceService {
     };
   }
 
-  async history(userId: string) {
+  async history(userId: string, cursor?: string, limit = 20) {
     const registros = await this.prisma.asistencia.findMany({
-      where: { docenteId: userId },
+      where: { empleadoId: userId },
       orderBy: { fecha: 'desc' },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
 
-    return registros.map((r) => ({
-      ...r,
-      fecha: r.fecha.toISOString().split('T')[0],
-    }));
-  }
+    const hasMore = registros.length > limit;
+    const data = hasMore ? registros.slice(0, limit) : registros;
 
-  async today() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const asistencias = await this.prisma.asistencia.findMany({
-      where: { fecha: today },
-      include: {
-        docente: {
-          select: { nombres: true },
-        },
-      },
-      orderBy: { hora: 'asc' },
-    });
-
-    return asistencias.map((a) => ({
-      nombres: a.docente.nombres,
-      hora: a.hora,
-      estado: a.estado.toLowerCase(),
-    }));
+    return {
+      data: data.map((r) => ({
+        ...r,
+        fecha: r.fecha.toISOString().split('T')[0],
+      })),
+      cursor: hasMore ? data[data.length - 1].id : null,
+    };
   }
 
   async missedDates(userId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const profile = await this.prisma.profile.findUnique({
+    const profile = await this.prisma.perfil.findUnique({
       where: { id: userId },
-      select: { createdAt: true },
+      select: {
+        createdAt: true,
+        turno: { select: { diasLaborales: true } },
+      },
     });
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -139,8 +138,10 @@ export class AttendanceService {
       ? new Date(Math.max(startOfMonth.getTime(), profile.createdAt.getTime()))
       : startOfMonth;
 
+    const diasLaborales = profile?.turno?.diasLaborales;
+
     const asistencias = await this.prisma.asistencia.findMany({
-      where: { docenteId: userId },
+      where: { empleadoId: userId },
       select: { fecha: true },
     });
 
@@ -155,8 +156,15 @@ export class AttendanceService {
       const dayOfWeek = current.getDay();
       const dateStr = current.toISOString().split('T')[0];
 
-      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !attendedDates.has(dateStr)) {
-        missed.push(dateStr);
+      if (diasLaborales) {
+        const dias = diasLaborales.split(',').map(Number);
+        if (dias.includes(dayOfWeek) && !attendedDates.has(dateStr)) {
+          missed.push(dateStr);
+        }
+      } else {
+        if (dayOfWeek !== 0 && dayOfWeek !== 6 && !attendedDates.has(dateStr)) {
+          missed.push(dateStr);
+        }
       }
 
       current.setDate(current.getDate() + 1);
@@ -165,60 +173,85 @@ export class AttendanceService {
     return missed;
   }
 
-  async byDate(date: string) {
+  async today(empresaId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const asistencias = await this.prisma.asistencia.findMany({
+      where: {
+        fecha: today,
+        empresaId,
+      },
+      include: {
+        empleado: {
+          select: { nombre: true, apellido: true },
+        },
+      },
+      orderBy: { hora: 'asc' },
+    });
+
+    return asistencias.map((a) => ({
+      nombres: `${a.empleado.nombre} ${a.empleado.apellido}`,
+      hora: a.hora,
+      estado: a.estado.toLowerCase(),
+    }));
+  }
+
+  async byDate(date: string, empresaId: string) {
     const targetDate = new Date(date + 'T00:00:00.000Z');
     const targetDateEnd = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
-    const docentes = await this.prisma.profile.findMany({
-      where: { rol: 'DOCENTE', estado: true },
+    const empleados = await this.prisma.perfil.findMany({
+      where: { rol: 'EMPLEADO', estado: true, empresaId },
       select: {
         id: true,
-        nombres: true,
+        nombre: true,
+        apellido: true,
         createdAt: true,
         turno: { select: { nombre: true } },
       },
-      orderBy: { nombres: 'asc' },
+      orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
     });
 
     const asistencias = await this.prisma.asistencia.findMany({
-      where: { fecha: targetDate },
-      select: { docenteId: true, hora: true, estado: true },
+      where: { fecha: targetDate, empresaId },
+      select: { empleadoId: true, hora: true, estado: true },
     });
 
     const asistenciaMap = new Map(
-      asistencias.map((a) => [a.docenteId, { hora: a.hora, estado: a.estado.toLowerCase() }]),
+      asistencias.map((a) => [a.empleadoId, { hora: a.hora, estado: a.estado.toLowerCase() }]),
     );
 
-    return docentes
+    return empleados
       .filter((d) => d.createdAt < targetDateEnd)
       .map((d) => ({
         id: d.id,
-        nombres: d.nombres,
+        nombres: `${d.nombre} ${d.apellido}`,
         turno: d.turno?.nombre || null,
         asistencia: asistenciaMap.get(d.id) || null,
       }));
   }
 
-  async stats() {
-    const totalDocentes = await this.prisma.profile.count({
-      where: { rol: 'DOCENTE' },
+  async stats(empresaId: string) {
+    const totalEmpleados = await this.prisma.perfil.count({
+      where: { rol: 'EMPLEADO', empresaId },
     });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const asistenciasHoy = await this.prisma.asistencia.findMany({
-      where: { fecha: today },
+      where: { fecha: today, empresaId },
     });
 
     const totalHoy = asistenciasHoy.length;
     const tardanzas = asistenciasHoy.filter(
       (a) => a.estado === 'TARDE',
     ).length;
-    const faltan = totalDocentes - totalHoy;
+    const faltan = totalEmpleados - totalHoy;
 
     return {
-      docentes: totalDocentes,
+      empleados: totalEmpleados,
       hoy: totalHoy,
       tarde: tardanzas,
       faltan: Math.max(0, faltan),

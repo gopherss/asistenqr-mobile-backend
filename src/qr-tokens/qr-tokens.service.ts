@@ -3,16 +3,18 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class QrTokensService {
-  generate() {
+  generate(empresaId: string) {
     const secret = process.env.TERMINAL_SECRET || 'terminal-secret';
     const timestamp = Math.floor(Date.now() / 1000).toString();
 
+    const payload = `${timestamp}.${empresaId}`;
+
     const signature = crypto
       .createHmac('sha256', secret)
-      .update(timestamp)
+      .update(payload)
       .digest('hex');
 
-    const token = `${timestamp}.${signature}`;
+    const token = `${payload}.${signature}`;
 
     return {
       token,

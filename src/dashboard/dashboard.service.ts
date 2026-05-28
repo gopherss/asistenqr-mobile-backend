@@ -5,19 +5,19 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getStats() {
-    const totalDocentes = await this.prisma.profile.count({
-      where: { rol: 'DOCENTE' },
+  async getStats(empresaId: string) {
+    const totalEmpleados = await this.prisma.perfil.count({
+      where: { rol: 'EMPLEADO', empresaId },
     });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const asistenciasHoy = await this.prisma.asistencia.findMany({
-      where: { fecha: today },
+      where: { fecha: today, empresaId },
       include: {
-        docente: {
-          select: { nombres: true },
+        empleado: {
+          select: { nombre: true, apellido: true },
         },
       },
       orderBy: { hora: 'asc' },
@@ -27,17 +27,17 @@ export class DashboardService {
     const tardanzas = asistenciasHoy.filter(
       (a) => a.estado === 'TARDE',
     ).length;
-    const faltan = totalDocentes - totalHoy;
+    const faltan = totalEmpleados - totalHoy;
 
     const presentes = asistenciasHoy.map((a) => ({
-      nombres: a.docente.nombres,
+      nombres: `${a.empleado.nombre} ${a.empleado.apellido}`,
       hora: a.hora,
       estado: a.estado.toLowerCase(),
     }));
 
     return {
       stats: {
-        docentes: totalDocentes,
+        empleados: totalEmpleados,
         hoy: totalHoy,
         tarde: tardanzas,
         faltan: Math.max(0, faltan),

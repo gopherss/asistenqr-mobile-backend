@@ -6,14 +6,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
-import { Role } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -28,11 +28,11 @@ export class AuthController {
 
   @Post('register')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.DIRECTOR)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registrar nuevo docente' })
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+  @ApiOperation({ summary: 'Registrar nuevo empleado' })
+  register(@Body() dto: RegisterDto, @CurrentUser('empresaId') empresaId: string) {
+    return this.auth.register(dto, empresaId);
   }
 
   @Get('me')

@@ -8,8 +8,9 @@ datasource db {
 }
 
 enum Role {
-  DIRECTOR
-  DOCENTE
+  SUPERADMIN
+  ADMIN
+  EMPLEADO
   TERMINAL
 }
 
@@ -18,22 +19,37 @@ enum EstadoAsistencia {
   TARDE
 }
 
-model Profile {
-  id        String   @id @default(uuid())
-  email     String   @unique
+model Empresa {
+  id           String    @id @default(uuid())
+  nombre       String
+  activo       Boolean   @default(true)
+  maxEmpleados Int       @default(20)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  perfiles     Perfil[]
+  turnos       Turno[]
+  asistencias  Asistencia[]
+
+  @@map("empresas")
+}
+
+model Perfil {
+  id        String     @id @default(uuid())
+  email     String     @unique
   password  String
-  nombres   String
-  rol       Role     @default(DOCENTE)
-  estado    Boolean  @default(true)
-  dni       String?
-  telefono  String?
-  turnoId   String?  @map("turno_id")
-  turno     Turno?   @relation(fields: [turnoId], references: [id])
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  nombre    String
+  apellido  String
+  rol       Role       @default(EMPLEADO)
+  estado    Boolean    @default(true)
+  empresaId String?    @map("empresa_id")
+  empresa   Empresa?   @relation(fields: [empresaId], references: [id])
+  turnoId   String?    @map("turno_id")
+  turno     Turno?     @relation(fields: [turnoId], references: [id])
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
   asistencias Asistencia[]
 
-  @@map("profiles")
+  @@map("perfiles")
 }
 
 model Turno {
@@ -43,22 +59,29 @@ model Turno {
   horaTolerancia String    @map("hora_tolerancia")
   horaSalida     String    @map("hora_salida")
   activo         Boolean   @default(true)
+  diasLaborales  String?
+  empresaId      String    @map("empresa_id")
+  empresa        Empresa   @relation(fields: [empresaId], references: [id])
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
-  profiles       Profile[]
+  perfiles       Perfil[]
 
   @@map("turnos")
 }
 
 model Asistencia {
   id        String             @id @default(uuid())
-  docenteId String             @map("docente_id")
-  docente   Profile            @relation(fields: [docenteId], references: [id])
+  empleadoId String             @map("empleado_id")
+  empleado   Perfil             @relation(fields: [empleadoId], references: [id])
+  empresaId String             @map("empresa_id")
+  empresa   Empresa            @relation(fields: [empresaId], references: [id])
   fecha     DateTime           @db.Date
   hora      String
   estado    EstadoAsistencia
   metodo    String             @default("qr")
   createdAt DateTime           @default(now()) @map("created_at")
 
+  @@index([empleadoId, fecha])
+  @@index([empresaId, fecha])
   @@map("asistencias")
 }

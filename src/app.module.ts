@@ -6,6 +6,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { QrTokensModule } from './qr-tokens/qr-tokens.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { EmpresasModule } from './empresas/empresas.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ShiftsModule,
     QrTokensModule,
     DashboardModule,
+    EmpresasModule,
   ],
 })
 export class AppModule {}
