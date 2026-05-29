@@ -127,18 +127,13 @@ export class AttendanceService {
 
     const profile = await this.prisma.perfil.findUnique({
       where: { id: userId },
-      select: {
-        createdAt: true,
-        turno: { select: { diasLaborales: true } },
-      },
+      select: { createdAt: true },
     });
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const startFrom = profile?.createdAt
       ? new Date(Math.max(startOfMonth.getTime(), profile.createdAt.getTime()))
       : startOfMonth;
-
-    const diasLaborales = profile?.turno?.diasLaborales;
 
     const asistencias = await this.prisma.asistencia.findMany({
       where: { empleadoId: userId },
@@ -156,15 +151,8 @@ export class AttendanceService {
       const dayOfWeek = current.getDay();
       const dateStr = current.toISOString().split('T')[0];
 
-      if (diasLaborales) {
-        const dias = diasLaborales.split(',').map(Number);
-        if (dias.includes(dayOfWeek) && !attendedDates.has(dateStr)) {
-          missed.push(dateStr);
-        }
-      } else {
-        if (dayOfWeek !== 0 && dayOfWeek !== 6 && !attendedDates.has(dateStr)) {
-          missed.push(dateStr);
-        }
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !attendedDates.has(dateStr)) {
+        missed.push(dateStr);
       }
 
       current.setDate(current.getDate() + 1);

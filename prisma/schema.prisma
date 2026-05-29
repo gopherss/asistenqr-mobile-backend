@@ -59,7 +59,6 @@ model Turno {
   horaTolerancia String    @map("hora_tolerancia")
   horaSalida     String    @map("hora_salida")
   activo         Boolean   @default(true)
-  diasLaborales  String?
   empresaId      String    @map("empresa_id")
   empresa        Empresa   @relation(fields: [empresaId], references: [id])
   createdAt      DateTime  @default(now()) @map("created_at")

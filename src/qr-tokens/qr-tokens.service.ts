@@ -18,7 +18,7 @@ export class QrTokensService {
 
     return {
       token,
-      expiresIn: 10,
+      expiresIn: 15,
     };
   }
 }
