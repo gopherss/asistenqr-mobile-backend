@@ -55,6 +55,7 @@ CREATE TABLE "asistencias" (
     "empresa_id" TEXT NOT NULL,
     "fecha" DATE NOT NULL,
     "hora" TEXT NOT NULL,
+    "hora_salida" TEXT,
     "estado" "EstadoAsistencia" NOT NULL,
     "metodo" TEXT NOT NULL DEFAULT 'qr',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

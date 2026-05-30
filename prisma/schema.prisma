@@ -76,6 +76,7 @@ model Asistencia {
   empresa   Empresa            @relation(fields: [empresaId], references: [id])
   fecha     DateTime           @db.Date
   hora      String
+  horaSalida String?           @map("hora_salida")
   estado    EstadoAsistencia
   metodo    String             @default("qr")
   createdAt DateTime           @default(now()) @map("created_at")

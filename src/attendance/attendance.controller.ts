@@ -29,6 +29,12 @@ export class AttendanceController {
     return this.service.checkIn(userId, empresaId, dto.qrToken);
   }
 
+  @Post('check-out')
+  @ApiOperation({ summary: 'Registrar salida con QR (empleado)' })
+  checkOut(@CurrentUser('id') userId: string, @CurrentUser('empresaId') empresaId: string, @Body() dto: CheckInDto) {
+    return this.service.checkOut(userId, empresaId, dto.qrToken);
+  }
+
   @Get('history')
   @ApiOperation({ summary: 'Historial de asistencias del empleado autenticado' })
   history(

@@ -26,6 +26,14 @@ export class CreateEmpresaDto {
   @ApiProperty({ example: 'admin123' })
   @IsString()
   public readonly adminPassword: string;
+
+  @ApiProperty({ example: 'terminal@empresa.com' })
+  @IsEmail()
+  public readonly terminalEmail: string;
+
+  @ApiProperty({ example: 'terminal123' })
+  @IsString()
+  public readonly terminalPassword: string;
 }
 
 export class UpdateEmpresaDto {
@@ -58,4 +66,19 @@ export class UpdateEmpresaDto {
   @IsString()
   @IsOptional()
   public readonly adminEmail?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  public readonly adminPassword?: string;
+
+  @ApiProperty({ required: false })
+  @IsEmail()
+  @IsOptional()
+  public readonly terminalEmail?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  public readonly terminalPassword?: string;
 }

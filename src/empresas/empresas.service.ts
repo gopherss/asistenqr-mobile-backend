@@ -9,8 +9,14 @@ export class EmpresasService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateEmpresaDto) {
-    const { adminNombre, adminApellido, adminEmail, adminPassword, ...empresaData } = dto;
+    const {
+      adminNombre, adminApellido, adminEmail, adminPassword,
+      terminalEmail, terminalPassword,
+      ...empresaData
+    } = dto;
+
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const hashedTerminalPassword = await bcrypt.hash(terminalPassword, 10);
 
     return this.prisma.$transaction(async (tx) => {
       const empresa = await tx.empresa.create({ data: empresaData });
@@ -26,7 +32,33 @@ export class EmpresasService {
         },
       });
 
-      return empresa;
+      await tx.perfil.create({
+        data: {
+          email: terminalEmail,
+          password: hashedTerminalPassword,
+          nombre: 'Terminal',
+          apellido: 'Terminal',
+          rol: Role.TERMINAL,
+          empresaId: empresa.id,
+        },
+      });
+
+      const turnosPorDefecto = [
+        { nombre: 'Mañana', horaEntrada: '07:00:00', horaTolerancia: '07:15:00', horaSalida: '12:00:00' },
+        { nombre: 'Tarde', horaEntrada: '13:00:00', horaTolerancia: '13:15:00', horaSalida: '18:00:00' },
+        { nombre: 'Noche', horaEntrada: '19:00:00', horaTolerancia: '19:15:00', horaSalida: '22:00:00' },
+      ];
+
+      for (const turno of turnosPorDefecto) {
+        await tx.turno.create({
+          data: { ...turno, empresaId: empresa.id },
+        });
+      }
+
+      return {
+        id: empresa.id,
+        nombre: empresa.nombre,
+      };
     });
   }
 
@@ -62,7 +94,12 @@ export class EmpresasService {
   }
 
   async update(id: string, dto: UpdateEmpresaDto) {
-    const { adminNombre, adminApellido, adminEmail, ...empresaData } = dto;
+    const {
+      adminNombre, adminApellido, adminEmail, adminPassword,
+      terminalEmail, terminalPassword,
+      ...empresaData
+    } = dto;
+
     const empresa = await this.prisma.empresa.findUnique({ where: { id } });
     if (!empresa) {
       throw new NotFoundException('Empresa no encontrada');
@@ -74,7 +111,7 @@ export class EmpresasService {
         data: empresaData,
       });
 
-      if (adminNombre || adminApellido || adminEmail) {
+      if (adminNombre || adminApellido || adminEmail || adminPassword) {
         const adminProfile = await tx.perfil.findFirst({
           where: { empresaId: id, rol: Role.ADMIN },
         });
@@ -86,6 +123,23 @@ export class EmpresasService {
               ...(adminNombre && { nombre: adminNombre }),
               ...(adminApellido && { apellido: adminApellido }),
               ...(adminEmail && { email: adminEmail }),
+              ...(adminPassword && { password: await bcrypt.hash(adminPassword, 10) }),
+            },
+          });
+        }
+      }
+
+      if (terminalEmail || terminalPassword) {
+        const terminalProfile = await tx.perfil.findFirst({
+          where: { empresaId: id, rol: Role.TERMINAL },
+        });
+
+        if (terminalProfile) {
+          await tx.perfil.update({
+            where: { id: terminalProfile.id },
+            data: {
+              ...(terminalEmail && { email: terminalEmail }),
+              ...(terminalPassword && { password: await bcrypt.hash(terminalPassword, 10) }),
             },
           });
         }

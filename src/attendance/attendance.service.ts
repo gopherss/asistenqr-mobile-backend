@@ -101,6 +101,79 @@ export class AttendanceService {
     };
   }
 
+  async checkOut(userId: string, empresaId: string, qrToken: string) {
+    const secret = process.env.TERMINAL_SECRET || 'terminal-secret';
+
+    const parts = qrToken.split('.');
+    if (parts.length !== 3) {
+      throw new BadRequestException('Token QR inválido');
+    }
+    const [timestampStr, qrEmpresaId, signature] = parts;
+    const timestamp = parseInt(timestampStr, 10);
+
+    if (isNaN(timestamp)) {
+      throw new BadRequestException('Token QR inválido');
+    }
+
+    if (qrEmpresaId !== empresaId) {
+      throw new ForbiddenException('El QR no pertenece a tu empresa');
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - timestamp) > 10) {
+      throw new BadRequestException('QR expirado');
+    }
+
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(`${timestampStr}.${qrEmpresaId}`)
+      .digest('hex');
+
+    if (signature !== expectedSig) {
+      throw new ForbiddenException('Token QR inválido');
+    }
+
+    const profile = await this.prisma.perfil.findUnique({
+      where: { id: userId },
+    });
+
+    if (!profile || !profile.estado) {
+      throw new ForbiddenException('Perfil no encontrado o inactivo');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const asistencia = await this.prisma.asistencia.findFirst({
+      where: { empleadoId: userId, fecha: today },
+    });
+
+    if (!asistencia) {
+      throw new BadRequestException('No tienes un check-in registrado hoy');
+    }
+
+    if (asistencia.horaSalida) {
+      throw new BadRequestException('Ya registraste tu salida hoy');
+    }
+
+    const nowDate = new Date();
+    const currentHour =
+      nowDate.getHours().toString().padStart(2, '0') + ':' +
+      nowDate.getMinutes().toString().padStart(2, '0') + ':00';
+
+    await this.prisma.asistencia.update({
+      where: { id: asistencia.id },
+      data: { horaSalida: currentHour },
+    });
+
+    return {
+      id: asistencia.id,
+      horaIngreso: asistencia.hora,
+      horaSalida: currentHour,
+      mensaje: 'Salida registrada correctamente',
+    };
+  }
+
   async history(userId: string, cursor?: string, limit = 20) {
     const registros = await this.prisma.asistencia.findMany({
       where: { empleadoId: userId },
@@ -181,6 +254,7 @@ export class AttendanceService {
     return asistencias.map((a) => ({
       nombres: `${a.empleado.nombre} ${a.empleado.apellido}`,
       hora: a.hora,
+      horaSalida: a.horaSalida,
       estado: a.estado.toLowerCase(),
     }));
   }
