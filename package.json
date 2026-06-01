@@ -7,10 +7,10 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "npx prisma migrate deploy && node dist/main",
+    "start:prod": "npx prisma migrate deploy; node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
