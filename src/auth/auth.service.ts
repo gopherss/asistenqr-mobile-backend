@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -89,6 +90,45 @@ export class AuthService {
     return this.generateAuthResponse(profile);
   }
 
+  async refresh(refreshToken: string) {
+    const tokenRecord = await this.prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+      include: { user: { include: { empresa: true } } },
+    });
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Refresh token inválido');
+    }
+
+    if (tokenRecord.expiresAt < new Date()) {
+      await this.prisma.refreshToken.delete({ where: { id: tokenRecord.id } });
+      throw new UnauthorizedException('Refresh token expirado');
+    }
+
+    if (!tokenRecord.user.estado) {
+      await this.prisma.refreshToken.delete({ where: { id: tokenRecord.id } });
+      throw new UnauthorizedException('Usuario inactivo');
+    }
+
+    if (tokenRecord.user.empresa && !tokenRecord.user.empresa.activo) {
+      await this.prisma.refreshToken.delete({ where: { id: tokenRecord.id } });
+      throw new UnauthorizedException('Empresa inactiva');
+    }
+
+    await this.prisma.refreshToken.delete({ where: { id: tokenRecord.id } });
+
+    return this.generateAuthResponse(tokenRecord.user);
+  }
+
+  async logout(refreshToken: string) {
+    if (refreshToken) {
+      await this.prisma.refreshToken.deleteMany({
+        where: { token: refreshToken },
+      });
+    }
+    return { message: 'Sesión cerrada' };
+  }
+
   async me(userId: string) {
     const profile = await this.prisma.perfil.findUnique({
       where: { id: userId },
@@ -111,6 +151,22 @@ export class AuthService {
     return user;
   }
 
+  private generateRefreshToken(userId: string): string {
+    const token = crypto.randomBytes(40).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    this.prisma.refreshToken.create({
+      data: {
+        token,
+        userId,
+        expiresAt,
+      },
+    });
+
+    return token;
+  }
+
   private generateAuthResponse(profile: { id: string; email: string; nombre: string; apellido: string; rol: string; empresaId: string | null }) {
     const payload = {
       sub: profile.id,
@@ -119,8 +175,11 @@ export class AuthService {
       empresaId: profile.empresaId,
     };
 
+    const refreshToken = this.generateRefreshToken(profile.id);
+
     return {
       access_token: this.jwt.sign(payload),
+      refresh_token: refreshToken,
       user: {
         id: profile.id,
         email: profile.email,

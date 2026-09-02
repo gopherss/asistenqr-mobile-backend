@@ -11,6 +11,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
@@ -33,6 +34,18 @@ export class AuthController {
   @ApiOperation({ summary: 'Registrar nuevo empleado' })
   register(@Body() dto: RegisterDto, @CurrentUser('empresaId') empresaId: string) {
     return this.auth.register(dto, empresaId);
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Renovar access token' })
+  refresh(@Body() dto: RefreshDto) {
+    return this.auth.refresh(dto.refresh_token);
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Cerrar sesión' })
+  logout(@Body() dto: RefreshDto) {
+    return this.auth.logout(dto.refresh_token);
   }
 
   @Get('me')
