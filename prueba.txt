@@ -1,0 +1,8 @@
+class Prueba {
+
+	public static void main( string[] args){
+
+	System.out.println("Me La Pelas Carnal!")
+
+	}
+}
